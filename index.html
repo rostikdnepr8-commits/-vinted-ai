@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Vinted AI Generator</title>
+
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Simple safe-area padding for iPhones */
+    body { padding-bottom: env(safe-area-inset-bottom); }
+    /* tiny spinner */
+    .spinner {
+      border: 3px solid rgba(0,0,0,0.08);
+      border-top-color: rgba(0,0,0,0.6);
+      border-radius: 999px;
+      width: 20px;
+      height: 20px;
+      animation: spin 0.9s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen text-gray-800 antialiased">
+  <div class="max-w-xl mx-auto p-4">
+    <header class="flex items-center justify-between mb-4">
+      <div>
+        <h1 class="text-2xl font-semibold">Vinted AI Generator</h1>
+        <p class="text-sm text-gray-500">Односторінковий мобільний додаток — оптимізовано для iPhone</p>
+      </div>
+      <button id="toggle-settings" aria-expanded="false" class="p-2 rounded-md bg-white shadow-sm hover:shadow-md">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0a1.724 1.724 0 002.35 1.01c.882-.41 1.88.392 1.51 1.356a1.724 1.724 0 00.487 1.909c.722.667.496 1.883-.396 2.294a1.724 1.724 0 00-1.01 2.35c.3.921-.755 1.688-1.54 1.17a1.724 1.724 0 00-2.034 0c-.785.518-1.84-.249-1.54-1.17a1.724 1.724 0 00-1.01-2.35c-.892-.411-1.118-1.627-.396-2.294a1.724 1.724 0 00.487-1.909c-.37-.964.628-1.766 1.51-1.356.87.404 1.918-.084 2.35-1.01z" />
+        </svg>
+      </button>
+    </header>
+
+    <!-- Settings panel (hidden by default) -->
+    <section id="settings-panel" class="mb-4 bg-white rounded-lg shadow p-4 hidden">
+      <h2 class="text-sm font-medium mb-2">Налаштування API</h2>
+      <p class="text-xs text-gray-500 mb-3">Введіть ваш Gemini API ключ (зберігається в localStorage). Для Generative API Google зазвичай потрібен OAuth Bearer токен — перевірте ваш доступ.</p>
+
+      <label class="block text-xs font-medium mb-1">Gemini API Key</label>
+      <div class="flex gap-2">
+        <input id="api-key" type="password" placeholder="Bearer token або API key" class="flex-1 px-3 py-2 border rounded-md bg-gray-50" />
+        <button id="toggle-key-visibility" class="px-3 py-2 bg-gray-100 rounded-md">Показати</button>
+      </div>
+
+      <div class="mt-3 flex items-center gap-2">
+        <button id="save-settings" class="px-4 py-2 bg-blue-600 text-white rounded-md shadow">Зберегти</button>
+        <button id="clear-settings" class="px-3 py-2 bg-red-50 text-red-700 rounded-md">Очистити</button>
+      </div>
+
+      <p class="mt-3 text-xs text-gray-400">Якщо ваш бекенд вимагає іншого формату (наприклад, proxy), адаптуйте код у секції JS.</p>
+    </section>
+
+    <!-- Upload area -->
+    <section class="bg-white rounded-lg shadow p-4 mb-4">
+      <label class="block text-sm font-medium mb-2">Завантажити фото (до 6)</label>
+      <input id="photo-input" type="file" accept="image/*" multiple class="mb-3" />
+
+      <div id="preview-grid" class="grid grid-cols-3 gap-2"></div>
+
+      <p class="mt-3 text-xs text-gray-500">Підтримуються JPG/PNG. Кожне фото буде конвертовано в base64 перед відправкою.</p>
+    </section>
+
+    <!-- Actions -->
+    <section class="mb-4 flex flex-col gap-3">
+      <button id="generate-btn" class="w-full px-4 py-3 bg-green-600 text-white rounded-md font-semibold flex items-center justify-center gap-2">
+        <span id="generate-label">Згенерувати оголошення (PL)</span>
+        <span id="loading-indicator" class="hidden"><span class="spinner" aria-hidden="true"></span></span>
+      </button>
+
+      <div class="flex gap-2">
+        <button id="clear-photos" class="flex-1 px-3 py-2 bg-gray-100 rounded-md">Очистити фото</button>
+        <button id="example-fill" class="px-3 py-2 bg-gray-100 rounded-md">Приклад</button>
+      </div>
+    </section>
+
+    <!-- Result -->
+    <section class="bg-white rounded-lg shadow p-4 mb-6">
+      <div class="flex items-start justify-between">
+        <h3 class="text-sm font-medium">Результат</h3>
+        <div class="flex items-center gap-2">
+          <button id="copy-btn" class="px-3 py-1 bg-blue-50 text-blue-700 rounded-md text-sm">Копіювати</button>
+        </div>
+      </div>
+
+      <textarea id="result" rows="10" class="mt-3 w-full p-3 border rounded-md bg-gray-50 text-sm" placeholder="Тут з'явиться згенерований текст..." readonly></textarea>
+    </section>
+
+    <footer class="text-center text-xs text-gray-400 pb-4">
+      <div>GitHub Pages • Tailwind CSS • Оптимізовано для мобільних пристроїв</div>
+    </footer>
+  </div>
+
+  <script>
+    // GitHub Copilot Chat Assistant — one-file SPA
+    // Увага: API-запит до Gemini залежить від вашого доступу. Можливо, треба буде адаптувати URL/формат тіла запиту під ваш бекенд або під Google Generative API.
+
+    const toggleSettingsBtn = document.getElementById('toggle-settings');
+    const settingsPanel = document.getElementById('settings-panel');
+    const apiKeyInput = document.getElementById('api-key');
+    const saveSettingsBtn = document.getElementById('save-settings');
+    const clearSettingsBtn = document.getElementById('clear-settings');
+    const toggleKeyVisibilityBtn = document.getElementById('toggle-key-visibility');
+
+    const photoInput = document.getElementById('photo-input');
+    const previewGrid = document.getElementById('preview-grid');
+    const clearPhotosBtn = document.getElementById('clear-photos');
+    const exampleFillBtn = document.getElementById('example-fill');
+
+    const generateBtn = document.getElementById('generate-btn');
+    const generateLabel = document.getElementById('generate-label');
+    const loadingIndicator = document.getElementById('loading-indicator');
+
+    const resultBox = document.getElementById('result');
+    const copyBtn = document.getElementById('copy-btn');
+
+    let photos = []; // { file, dataUrl }
+
+    // --- Settings handling ---
+    function loadSettings() {
+      const key = localStorage.getItem('vinted_ai_gemini_key') || '';
+      apiKeyInput.value = key;
+    }
+
+    function saveSettings() {
+      localStorage.setItem('vinted_ai_gemini_key', apiKeyInput.value.trim());
+      showToast('API ключ збережено');
+    }
+
+    function clearSettings() {
+      localStorage.removeItem('vinted_ai_gemini_key');
+      apiKeyInput.value = '';
+      showToast('API ключ видалено');
+    }
+
+    toggleSettingsBtn.addEventListener('click', () => {
+      const isHidden = settingsPanel.classList.toggle('hidden');
+      toggleSettingsBtn.setAttribute('aria-expanded', String(!isHidden));
+    });
+
+    toggleKeyVisibilityBtn.addEventListener('click', () => {
+      if (apiKeyInput.type === 'password') {
+        apiKeyInput.type = 'text';
+        toggleKeyVisibilityBtn.textContent = 'Сховати';
+      } else {
+        apiKeyInput.type = 'password';
+        toggleKeyVisibilityBtn.textContent = 'Показати';
+      }
+    });
+
+    saveSettingsBtn.addEventListener('click', saveSettings);
+    clearSettingsBtn.addEventListener('click', clearSettings);
+
+    // --- Photo handling ---
+    photoInput.addEventListener('change', async (e) => {
+      const files = Array.from(e.target.files || []);
+      if (!files.length) return;
+
+      for (const file of files) {
+        if (!file.type.startsWith('image/')) continue;
+        if (photos.length >= 6) {
+          showToast('Максимум 6 фото');
+          break;
+        }
+        const dataUrl = await fileToDataUrl(file);
+        photos.push({ file, dataUrl });
+      }
+      renderPreviews();
+      photoInput.value = ''; // reset
+    });
+
+    function fileToDataUrl(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function renderPreviews() {
+      previewGrid.innerHTML = '';
+      photos.forEach((p, idx) => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'relative rounded overflow-hidden bg-gray-100';
+
+        const img = document.createElement('img');
+        img.src = p.dataUrl;
+        img.alt = `Фото ${idx+1}`;
+        img.className = 'w-full h-24 object-cover';
+
+        const delBtn = document.createElement('button');
+        delBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>';
+        delBtn.className = 'absolute top-1 right-1 bg-red-600 p-1 rounded-full shadow';
+        delBtn.title = 'Видалити';
+        delBtn.addEventListener('click', () => {
+          photos.splice(idx, 1);
+          renderPreviews();
+        });
+
+        wrapper.appendChild(img);
+        wrapper.appendChild(delBtn);
+        previewGrid.appendChild(wrapper);
+      });
+
+      if (photos.length === 0) {
+        previewGrid.innerHTML = '<div class="col-span-3 text-xs text-gray-400">Порожньо — додайте фото</div>';
+      }
+    }
+
+    clearPhotosBtn.addEventListener('click', () => {
+      photos = [];
+      renderPreviews();
+    });
+
+    exampleFillBtn.addEventListener('click', () => {
+      // For demo: fill with placeholder images (data URLs)
+      // These are small SVG data URIs as placeholders (no file objects)
+      const placeholders = [
+        svgPlaceholder('Red Dress', '#F87171'),
+        svgPlaceholder('Blue Jeans', '#60A5FA'),
+        svgPlaceholder('Leather Bag', '#FBBF24'),
+      ];
+      photos = placeholders.map((dataUrl, i) => ({ file: null, dataUrl }));
+      renderPreviews();
+    });
+
+    function svgPlaceholder(text, color) {
+      const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='800' height='800'><rect fill='${color}' width='100%' height='100%'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-size='36' fill='white'>${text}</text></svg>`;
+      return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    }
+
+    // --- Generate logic ---
+    generateBtn.addEventListener('click', async () => {
+      const apiKey = localStorage.getItem('vinted_ai_gemini_key') || apiKeyInput.value.trim();
+      if (!apiKey) {
+        showToast('Вкажіть Gemini API Key в налаштуваннях');
+        // open settings
+        settingsPanel.classList.remove('hidden');
+        return;
+      }
+      if (photos.length === 0) {
+        showToast('Додайте хоча б одне фото');
+        return;
+      }
+
+      setLoading(true);
+
+      try {
+        // Convert photos to base64 strings (strip data URL metadata)
+        const base64Images = await Promise.all(photos.map(async p => {
+          if (!p.dataUrl) return null;
+          // data:[<mediatype>][;base64],<data>
+          const parts = p.dataUrl.split(',');
+          return parts[1]; // base64 payload
+        }));
+
+        // Polish instruction for Gemini
+        const polishPrompt = `
+Na podstawie załączonych zdjęć stwórz profesjonalne ogłoszenie na Vinted (język polski).
+Wygeneruj odpowiedź w formacie JSON z kluczami:
+- "title": krótki, chwytliwy tytuł (≤60 znaków),
+- "description": szczegółowy opis (stan, materiał, kolor, rozmiar, ewentualne wady i zalety). Użyj punktów oraz naturalnego, przyjaznego tonu,
+- "hashtags": lista hashtagów (10-15), oddzielona spacjami lub przecinkami.
+
+Zdjęcia: poniżej (zakodowane base64). Na podstawie zdjęć dopasuj opis stanu i cechy przedmiotu. Nie wymyślaj fałszywych informacji o marce, chyba że są widoczne na zdjęciach. Jeśli nie można określić rozmiaru, napisz "rozmiar: możliwy do doprecyzowania".
+Odpowiedź proszę zwrócić jedynie jako JSON.
+`;
+
+        // Build request payload.
+        // NOTE: Formatuj payload zgodnie z wymogami Twojego dostawcy API.
+        // Poniżej przykład dla Google Generative API-like endpoint — może wymagać adaptacji.
+        const apiUrl = 'https://generative.googleapis.com/v1/models/gemini-1.5-flash:generate';
+
+        const body = {
+          // "input" or "prompt" key may vary — adapt if needed.
+          prompt: polishPrompt + '\n\nZdjęcia (base64):\n' + base64Images.map((b, i) => `Image ${i+1}: data:image/*;base64,${b}`).join('\n\n'),
+          // minimal options
+          temperature: 0.2,
+          maxOutputTokens: 800
+        };
+
+        // Perform request
+        const resp = await fetch(apiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: JSON.stringify(body)
+        });
+
+        if (!resp.ok) {
+          const text = await resp.text();
+          throw new Error(`Помилка API: ${resp.status} ${resp.statusText}\n${text}`);
+        }
+
+        const contentType = resp.headers.get('content-type') || '';
+        let resultText = '';
+
+        if (contentType.includes('application/json')) {
+          const json = await resp.json();
+          // Try to extract text — providers vary on structure.
+          // Common locations: json.outputText / json.candidates[0].output / json.choices[0].message.content
+          if (json.outputText) {
+            resultText = json.outputText;
+          } else if (json.candidates && json.candidates[0] && json.candidates[0].content) {
+            resultText = json.candidates[0].content;
+          } else if (json.choices && json.choices[0] && json.choices[0].message && json.choices[0].message.content) {
+            resultText = json.choices[0].message.content;
+          } else {
+            // fallback: pretty-print JSON
+            resultText = JSON.stringify(json, null, 2);
+          }
+        } else {
+          // plain text
+          resultText = await resp.text();
+        }
+
+        // If it's JSON-like inside text, try to prettify
+        try {
+          const parsed = JSON.parse(resultText);
+          resultBox.value = JSON.stringify(parsed, null, 2);
+        } catch (e) {
+          resultBox.value = resultText;
+        }
+
+        showToast('Генерація завершена');
+      } catch (err) {
+        console.error(err);
+        showToast(String(err), true);
+        resultBox.value = 'Помилка: ' + String(err);
+      } finally {
+        setLoading(false);
+      }
+    });
+
+    function setLoading(isLoading) {
+      if (isLoading) {
+        generateBtn.disabled = true;
+        loadingIndicator.classList.remove('hidden');
+        generateLabel.textContent = 'Генерація...';
+      } else {
+        generateBtn.disabled = false;
+        loadingIndicator.classList.add('hidden');
+        generateLabel.textContent = 'Згенерувати оголошення (PL)';
+      }
+    }
+
+    // --- Copy to clipboard ---
+    copyBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(resultBox.value);
+        showToast('Скопійовано в буфер обміну');
+      } catch (e) {
+        showToast('Не вдалося скопіювати', true);
+      }
+    });
+
+    // --- Simple toast ---
+    let toastTimeout;
+    function showToast(message, isError = false) {
+      const existing = document.getElementById('app-toast');
+      if (existing) existing.remove();
+      const div = document.createElement('div');
+      div.id = 'app-toast';
+      div.className = 'fixed left-1/2 -translate-x-1/2 bottom-8 z-50';
+      div.innerHTML = `<div class="px-4 py-2 rounded-md text-sm ${isError ? 'bg-red-600 text-white' : 'bg-black text-white'} shadow">${escapeHtml(message)}</div>`;
+      document.body.appendChild(div);
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => div.remove(), 3500);
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    // --- Init ---
+    loadSettings();
+    renderPreviews();
+
+    // Optional: prompt user to install as PWA on iOS
+    // (no-op here, but meta tags at top help with appearance)
+  </script>
+</body>
+</html>
