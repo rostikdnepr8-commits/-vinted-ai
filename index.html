@@ -1,392 +1,304 @@
-<!doctype html>
-<html lang="uk">
+<!DOCTYPE html>
+<html lang="pl">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <title>Vinted AI Generator</title>
-
-  <!-- Tailwind CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    /* Simple safe-area padding for iPhones */
-    body { padding-bottom: env(safe-area-inset-bottom); }
-    /* tiny spinner */
-    .spinner {
-      border: 3px solid rgba(0,0,0,0.08);
-      border-top-color: rgba(0,0,0,0.6);
-      border-radius: 999px;
-      width: 20px;
-      height: 20px;
-      animation: spin 0.9s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vinted AI Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-50 min-h-screen text-gray-800 antialiased">
-  <div class="max-w-xl mx-auto p-4">
-    <header class="flex items-center justify-between mb-4">
-      <div>
-        <h1 class="text-2xl font-semibold">Vinted AI Generator</h1>
-        <p class="text-sm text-gray-500">Односторінковий мобільний додаток — оптимізовано для iPhone</p>
-      </div>
-      <button id="toggle-settings" aria-expanded="false" class="p-2 rounded-md bg-white shadow-sm hover:shadow-md">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0a1.724 1.724 0 002.35 1.01c.882-.41 1.88.392 1.51 1.356a1.724 1.724 0 00.487 1.909c.722.667.496 1.883-.396 2.294a1.724 1.724 0 00-1.01 2.35c.3.921-.755 1.688-1.54 1.17a1.724 1.724 0 00-2.034 0c-.785.518-1.84-.249-1.54-1.17a1.724 1.724 0 00-1.01-2.35c-.892-.411-1.118-1.627-.396-2.294a1.724 1.724 0 00.487-1.909c-.37-.964.628-1.766 1.51-1.356.87.404 1.918-.084 2.35-1.01z" />
-        </svg>
-      </button>
+<body class="bg-gray-50 text-gray-900 font-sans antialiased min-h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-white shadow-sm py-4 px-6 sticky top-0 z-10">
+        <div class="max-w-md mx-auto flex justify-between items-center">
+            <h1 class="text-xl font-bold text-emerald-600">🛍️ Vinted AI Generator</h1>
+            <button onclick="toggleSettings()" class="text-gray-500 text-sm bg-gray-100 px-3 py-1.5 rounded-full hover:bg-gray-200">API Ключ</button>
+        </div>
     </header>
 
-    <!-- Settings panel (hidden by default) -->
-    <section id="settings-panel" class="mb-4 bg-white rounded-lg shadow p-4 hidden">
-      <h2 class="text-sm font-medium mb-2">Налаштування API</h2>
-      <p class="text-xs text-gray-500 mb-3">Введіть ваш Gemini API ключ (зберігається в localStorage). Для Generative API Google зазвичай потрібен OAuth Bearer токен — перевірте ваш доступ.</p>
+    <!-- Main Container -->
+    <main class="max-w-md mx-auto p-4 flex-grow w-full space-y-6">
 
-      <label class="block text-xs font-medium mb-1">Gemini API Key</label>
-      <div class="flex gap-2">
-        <input id="api-key" type="password" placeholder="Bearer token або API key" class="flex-1 px-3 py-2 border rounded-md bg-gray-50" />
-        <button id="toggle-key-visibility" class="px-3 py-2 bg-gray-100 rounded-md">Показати</button>
-      </div>
-
-      <div class="mt-3 flex items-center gap-2">
-        <button id="save-settings" class="px-4 py-2 bg-blue-600 text-white rounded-md shadow">Зберегти</button>
-        <button id="clear-settings" class="px-3 py-2 bg-red-50 text-red-700 rounded-md">Очистити</button>
-      </div>
-
-      <p class="mt-3 text-xs text-gray-400">Якщо ваш бекенд вимагає іншого формату (наприклад, proxy), адаптуйте код у секції JS.</p>
-    </section>
-
-    <!-- Upload area -->
-    <section class="bg-white rounded-lg shadow p-4 mb-4">
-      <label class="block text-sm font-medium mb-2">Завантажити фото (до 6)</label>
-      <input id="photo-input" type="file" accept="image/*" multiple class="mb-3" />
-
-      <div id="preview-grid" class="grid grid-cols-3 gap-2"></div>
-
-      <p class="mt-3 text-xs text-gray-500">Підтримуються JPG/PNG. Кожне фото буде конвертовано в base64 перед відправкою.</p>
-    </section>
-
-    <!-- Actions -->
-    <section class="mb-4 flex flex-col gap-3">
-      <button id="generate-btn" class="w-full px-4 py-3 bg-green-600 text-white rounded-md font-semibold flex items-center justify-center gap-2">
-        <span id="generate-label">Згенерувати оголошення (PL)</span>
-        <span id="loading-indicator" class="hidden"><span class="spinner" aria-hidden="true"></span></span>
-      </button>
-
-      <div class="flex gap-2">
-        <button id="clear-photos" class="flex-1 px-3 py-2 bg-gray-100 rounded-md">Очистити фото</button>
-        <button id="example-fill" class="px-3 py-2 bg-gray-100 rounded-md">Приклад</button>
-      </div>
-    </section>
-
-    <!-- Result -->
-    <section class="bg-white rounded-lg shadow p-4 mb-6">
-      <div class="flex items-start justify-between">
-        <h3 class="text-sm font-medium">Результат</h3>
-        <div class="flex items-center gap-2">
-          <button id="copy-btn" class="px-3 py-1 bg-blue-50 text-blue-700 rounded-md text-sm">Копіювати</button>
+        <!-- Settings Modal / Panel -->
+        <div id="settingsPanel" class="hidden bg-white p-4 rounded-2xl shadow-sm border border-gray-100 space-y-3">
+            <label class="block text-sm font-medium text-gray-700">Введи Gemini API Key:</label>
+            <input type="password" id="apiKeyInput" placeholder="AIzaSy..." class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+            <button onclick="saveApiKey()" class="w-full bg-emerald-600 text-white py-2 rounded-xl text-sm font-semibold hover:bg-emerald-700">Зберегти ключ</button>
         </div>
-      </div>
 
-      <textarea id="result" rows="10" class="mt-3 w-full p-3 border rounded-md bg-gray-50 text-sm" placeholder="Тут з'явиться згенерований текст..." readonly></textarea>
-    </section>
+        <!-- 1. AI Photo Generation Section -->
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 space-y-4">
+            <h2 class="font-semibold text-gray-800">1. Генерація фото товару (AI)</h2>
+            <div>
+                <label class="block text-xs font-medium text-gray-500 mb-1">Вибери локацію або сцену:</label>
+                <input type="text" id="locationInput" value="у Вроцлаві, стильний інтер'єр" placeholder="Наприклад: у Вроцлаві, на вулиці, у студії" class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+            </div>
+            
+            <button onclick="generateAiPhoto()" id="photoBtn" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-semibold shadow-sm hover:bg-indigo-700 transition flex items-center justify-center space-x-2 text-sm">
+                <span>📸 Згенерувати фото через AI</span>
+            </button>
 
-    <footer class="text-center text-xs text-gray-400 pb-4">
-      <div>GitHub Pages • Tailwind CSS • Оптимізовано для мобільних пристроїв</div>
-    </footer>
-  </div>
+            <!-- Photo Loader -->
+            <div id="photoLoader" class="hidden text-center py-4">
+                <div class="inline-block animate-spin rounded-full h-6 w-6 border-3 border-indigo-500 border-t-transparent"></div>
+                <p class="text-xs text-gray-500 mt-1">Gemini створює фото...</p>
+            </div>
 
-  <script>
-    // GitHub Copilot Chat Assistant — one-file SPA
-    // Увага: API-запит до Gemini залежить від вашого доступу. Можливо, треба буде адаптувати URL/формат тіла запиту під ваш бекенд або під Google Generative API.
+            <!-- Generated Photo Preview -->
+            <div id="generatedPhotoContainer" class="hidden space-y-3">
+                <div class="relative aspect-square rounded-xl overflow-hidden border border-gray-200 bg-gray-100">
+                    <img id="aiResultImage" src="" class="w-full h-full object-cover">
+                </div>
+                <div class="flex space-x-2">
+                    <button onclick="generateAiPhoto()" class="flex-1 bg-gray-100 text-gray-700 py-2 rounded-xl text-xs font-semibold hover:bg-gray-200 transition">🔄 Згенерувати ще раз</button>
+                    <a id="downloadPhotoBtn" download="vinted-ai-photo.png" class="flex-1 bg-emerald-50 text-emerald-700 py-2 rounded-xl text-xs font-semibold text-center hover:bg-emerald-100 transition flex items-center justify-center">💾 Завантажити</a>
+                </div>
+            </div>
+        </div>
 
-    const toggleSettingsBtn = document.getElementById('toggle-settings');
-    const settingsPanel = document.getElementById('settings-panel');
-    const apiKeyInput = document.getElementById('api-key');
-    const saveSettingsBtn = document.getElementById('save-settings');
-    const clearSettingsBtn = document.getElementById('clear-settings');
-    const toggleKeyVisibilityBtn = document.getElementById('toggle-key-visibility');
+        <!-- 2. Listing Generator Section -->
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 space-y-4">
+            <h2 class="font-semibold text-gray-800">2. Завантаж фото товару (до 6 шт.)</h2>
+            
+            <label class="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-2xl p-5 cursor-pointer hover:border-emerald-500 bg-gray-50 transition">
+                <span class="text-2xl mb-1">📂</span>
+                <span class="text-sm font-medium text-gray-600">Обрати фото з галереї</span>
+                <input type="file" id="imageInput" accept="image/*" multiple class="hidden" onchange="handleImages(event)">
+            </label>
 
-    const photoInput = document.getElementById('photo-input');
-    const previewGrid = document.getElementById('preview-grid');
-    const clearPhotosBtn = document.getElementById('clear-photos');
-    const exampleFillBtn = document.getElementById('example-fill');
+            <!-- Previews -->
+            <div id="previewContainer" class="grid grid-cols-3 gap-2"></div>
+        </div>
 
-    const generateBtn = document.getElementById('generate-btn');
-    const generateLabel = document.getElementById('generate-label');
-    const loadingIndicator = document.getElementById('loading-indicator');
+        <!-- Action Button -->
+        <button onclick="generateListing()" id="generateBtn" class="w-full bg-emerald-600 text-white py-3.5 rounded-2xl font-semibold shadow-md hover:bg-emerald-700 transition flex items-center justify-center space-x-2">
+            <span>✨ Згенерувати оголошення (PL)</span>
+        </button>
 
-    const resultBox = document.getElementById('result');
-    const copyBtn = document.getElementById('copy-btn');
+        <!-- Listing Loader -->
+        <div id="loader" class="hidden text-center py-6">
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-emerald-500 border-t-transparent"></div>
+            <p class="text-sm text-gray-500 mt-2">Gemini аналізує фото та пише опис...</p>
+        </div>
 
-    let photos = []; // { file, dataUrl }
+        <!-- Result Section -->
+        <div id="resultSection" class="hidden bg-white p-5 rounded-2xl shadow-sm border border-gray-100 space-y-4">
+            <div class="flex justify-between items-center">
+                <h2 class="font-semibold text-gray-800">3. Готове оголошення (PL)</h2>
+                <button onclick="copyResult()" class="text-xs bg-emerald-50 text-emerald-700 font-medium px-3 py-1.5 rounded-lg hover:bg-emerald-100">Копіювати</button>
+            </div>
+            <textarea id="resultText" class="w-full h-64 p-3 border rounded-xl text-sm font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none"></textarea>
+        </div>
 
-    // --- Settings handling ---
-    function loadSettings() {
-      const key = localStorage.getItem('vinted_ai_gemini_key') || '';
-      apiKeyInput.value = key;
-    }
+    </main>
 
-    function saveSettings() {
-      localStorage.setItem('vinted_ai_gemini_key', apiKeyInput.value.trim());
-      showToast('API ключ збережено');
-    }
+    <script>
+        let selectedFiles = [];
 
-    function clearSettings() {
-      localStorage.removeItem('vinted_ai_gemini_key');
-      apiKeyInput.value = '';
-      showToast('API ключ видалено');
-    }
-
-    toggleSettingsBtn.addEventListener('click', () => {
-      const isHidden = settingsPanel.classList.toggle('hidden');
-      toggleSettingsBtn.setAttribute('aria-expanded', String(!isHidden));
-    });
-
-    toggleKeyVisibilityBtn.addEventListener('click', () => {
-      if (apiKeyInput.type === 'password') {
-        apiKeyInput.type = 'text';
-        toggleKeyVisibilityBtn.textContent = 'Сховати';
-      } else {
-        apiKeyInput.type = 'password';
-        toggleKeyVisibilityBtn.textContent = 'Показати';
-      }
-    });
-
-    saveSettingsBtn.addEventListener('click', saveSettings);
-    clearSettingsBtn.addEventListener('click', clearSettings);
-
-    // --- Photo handling ---
-    photoInput.addEventListener('change', async (e) => {
-      const files = Array.from(e.target.files || []);
-      if (!files.length) return;
-
-      for (const file of files) {
-        if (!file.type.startsWith('image/')) continue;
-        if (photos.length >= 6) {
-          showToast('Максимум 6 фото');
-          break;
-        }
-        const dataUrl = await fileToDataUrl(file);
-        photos.push({ file, dataUrl });
-      }
-      renderPreviews();
-      photoInput.value = ''; // reset
-    });
-
-    function fileToDataUrl(file) {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-    }
-
-    function renderPreviews() {
-      previewGrid.innerHTML = '';
-      photos.forEach((p, idx) => {
-        const wrapper = document.createElement('div');
-        wrapper.className = 'relative rounded overflow-hidden bg-gray-100';
-
-        const img = document.createElement('img');
-        img.src = p.dataUrl;
-        img.alt = `Фото ${idx+1}`;
-        img.className = 'w-full h-24 object-cover';
-
-        const delBtn = document.createElement('button');
-        delBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>';
-        delBtn.className = 'absolute top-1 right-1 bg-red-600 p-1 rounded-full shadow';
-        delBtn.title = 'Видалити';
-        delBtn.addEventListener('click', () => {
-          photos.splice(idx, 1);
-          renderPreviews();
-        });
-
-        wrapper.appendChild(img);
-        wrapper.appendChild(delBtn);
-        previewGrid.appendChild(wrapper);
-      });
-
-      if (photos.length === 0) {
-        previewGrid.innerHTML = '<div class="col-span-3 text-xs text-gray-400">Порожньо — додайте фото</div>';
-      }
-    }
-
-    clearPhotosBtn.addEventListener('click', () => {
-      photos = [];
-      renderPreviews();
-    });
-
-    exampleFillBtn.addEventListener('click', () => {
-      // For demo: fill with placeholder images (data URLs)
-      // These are small SVG data URIs as placeholders (no file objects)
-      const placeholders = [
-        svgPlaceholder('Red Dress', '#F87171'),
-        svgPlaceholder('Blue Jeans', '#60A5FA'),
-        svgPlaceholder('Leather Bag', '#FBBF24'),
-      ];
-      photos = placeholders.map((dataUrl, i) => ({ file: null, dataUrl }));
-      renderPreviews();
-    });
-
-    function svgPlaceholder(text, color) {
-      const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='800' height='800'><rect fill='${color}' width='100%' height='100%'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-size='36' fill='white'>${text}</text></svg>`;
-      return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
-    }
-
-    // --- Generate logic ---
-    generateBtn.addEventListener('click', async () => {
-      const apiKey = localStorage.getItem('vinted_ai_gemini_key') || apiKeyInput.value.trim();
-      if (!apiKey) {
-        showToast('Вкажіть Gemini API Key в налаштуваннях');
-        // open settings
-        settingsPanel.classList.remove('hidden');
-        return;
-      }
-      if (photos.length === 0) {
-        showToast('Додайте хоча б одне фото');
-        return;
-      }
-
-      setLoading(true);
-
-      try {
-        // Convert photos to base64 strings (strip data URL metadata)
-        const base64Images = await Promise.all(photos.map(async p => {
-          if (!p.dataUrl) return null;
-          // data:[<mediatype>][;base64],<data>
-          const parts = p.dataUrl.split(',');
-          return parts[1]; // base64 payload
-        }));
-
-        // Polish instruction for Gemini
-        const polishPrompt = `
-Na podstawie załączonych zdjęć stwórz profesjonalne ogłoszenie na Vinted (język polski).
-Wygeneruj odpowiedź w formacie JSON z kluczami:
-- "title": krótki, chwytliwy tytuł (≤60 znaków),
-- "description": szczegółowy opis (stan, materiał, kolor, rozmiar, ewentualne wady i zalety). Użyj punktów oraz naturalnego, przyjaznego tonu,
-- "hashtags": lista hashtagów (10-15), oddzielona spacjami lub przecinkami.
-
-Zdjęcia: poniżej (zakodowane base64). Na podstawie zdjęć dopasuj opis stanu i cechy przedmiotu. Nie wymyślaj fałszywych informacji o marce, chyba że są widoczne na zdjęciach. Jeśli nie można określić rozmiaru, napisz "rozmiar: możliwy do doprecyzowania".
-Odpowiedź proszę zwrócić jedynie jako JSON.
-`;
-
-        // Build request payload.
-        // NOTE: Formatuj payload zgodnie z wymogami Twojego dostawcy API.
-        // Poniżej przykład dla Google Generative API-like endpoint — może wymagać adaptacji.
-        const apiUrl = 'https://generative.googleapis.com/v1/models/gemini-1.5-flash:generate';
-
-        const body = {
-          // "input" or "prompt" key may vary — adapt if needed.
-          prompt: polishPrompt + '\n\nZdjęcia (base64):\n' + base64Images.map((b, i) => `Image ${i+1}: data:image/*;base64,${b}`).join('\n\n'),
-          // minimal options
-          temperature: 0.2,
-          maxOutputTokens: 800
+        window.onload = () => {
+            const savedKey = localStorage.getItem('gemini_api_key');
+            if (savedKey) {
+                document.getElementById('apiKeyInput').value = savedKey;
+            } else {
+                document.getElementById('settingsPanel').classList.remove('hidden');
+            }
         };
 
-        // Perform request
-        const resp = await fetch(apiUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
-          },
-          body: JSON.stringify(body)
-        });
-
-        if (!resp.ok) {
-          const text = await resp.text();
-          throw new Error(`Помилка API: ${resp.status} ${resp.statusText}\n${text}`);
+        function toggleSettings() {
+            document.getElementById('settingsPanel').classList.toggle('hidden');
         }
 
-        const contentType = resp.headers.get('content-type') || '';
-        let resultText = '';
-
-        if (contentType.includes('application/json')) {
-          const json = await resp.json();
-          // Try to extract text — providers vary on structure.
-          // Common locations: json.outputText / json.candidates[0].output / json.choices[0].message.content
-          if (json.outputText) {
-            resultText = json.outputText;
-          } else if (json.candidates && json.candidates[0] && json.candidates[0].content) {
-            resultText = json.candidates[0].content;
-          } else if (json.choices && json.choices[0] && json.choices[0].message && json.choices[0].message.content) {
-            resultText = json.choices[0].message.content;
-          } else {
-            // fallback: pretty-print JSON
-            resultText = JSON.stringify(json, null, 2);
-          }
-        } else {
-          // plain text
-          resultText = await resp.text();
+        function saveApiKey() {
+            const key = document.getElementById('apiKeyInput').value.trim();
+            if (key) {
+                localStorage.setItem('gemini_api_key', key);
+                alert('Ключ успішно збережено!');
+                document.getElementById('settingsPanel').classList.add('hidden');
+            } else {
+                alert('Введи дійсний ключ!');
+            }
         }
 
-        // If it's JSON-like inside text, try to prettify
-        try {
-          const parsed = JSON.parse(resultText);
-          resultBox.value = JSON.stringify(parsed, null, 2);
-        } catch (e) {
-          resultBox.value = resultText;
+        // AI Photo Generation logic
+        async function generateAiPhoto() {
+            const apiKey = localStorage.getItem('gemini_api_key');
+            if (!apiKey) {
+                alert('Спочатку введи та збережи свій Gemini API ключ!');
+                document.getElementById('settingsPanel').classList.remove('hidden');
+                return;
+            }
+
+            const location = document.getElementById('locationInput').value.trim() || 'у Вроцлаві';
+            const loader = document.getElementById('photoLoader');
+            const container = document.getElementById('generatedPhotoContainer');
+            const btn = document.getElementById('photoBtn');
+
+            loader.classList.remove('hidden');
+            container.classList.add('hidden');
+            btn.disabled = true;
+
+            try {
+                const prompt = `A professional, clean and aesthetic e-commerce product photography background set ${location}, high quality, realistic, perfect for a Vinted listing.`;
+
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [{ text: prompt }]
+                        }],
+                        generationConfig: {
+                            responseModalities: ["IMAGE", "TEXT"]
+                        }
+                    })
+                });
+
+                const data = await response.json();
+                let imageUrl = null;
+
+                if (data.candidates && data.candidates[0].content && data.candidates[0].content.parts) {
+                    for (const part of data.candidates[0].content.parts) {
+                        if (part.inline_data) {
+                            imageUrl = `data:${part.inline_data.mime_type};base64,${part.inline_data.data}`;
+                            break;
+                        }
+                    }
+                }
+
+                if (imageUrl) {
+                    document.getElementById('aiResultImage').src = imageUrl;
+                    document.getElementById('downloadPhotoBtn').href = imageUrl;
+                    container.classList.remove('hidden');
+                } else {
+                    alert('Не вдалося згенерувати фото. Перевір ключ або спробуй ще раз.');
+                }
+
+            } catch (error) {
+                console.error(error);
+                alert('Помилка при генерації фото.');
+            } finally {
+                loader.classList.add('hidden');
+                btn.disabled = false;
+            }
         }
 
-        showToast('Генерація завершена');
-      } catch (err) {
-        console.error(err);
-        showToast(String(err), true);
-        resultBox.value = 'Помилка: ' + String(err);
-      } finally {
-        setLoading(false);
-      }
-    });
+        // Multiple images handling
+        function handleImages(event) {
+            const files = Array.from(event.target.files);
+            if (selectedFiles.length + files.length > 6) {
+                alert('Максимум можна завантажити 6 фотографій!');
+                return;
+            }
 
-    function setLoading(isLoading) {
-      if (isLoading) {
-        generateBtn.disabled = true;
-        loadingIndicator.classList.remove('hidden');
-        generateLabel.textContent = 'Генерація...';
-      } else {
-        generateBtn.disabled = false;
-        loadingIndicator.classList.add('hidden');
-        generateLabel.textContent = 'Згенерувати оголошення (PL)';
-      }
-    }
+            selectedFiles = selectedFiles.concat(files);
+            renderPreviews();
+        }
 
-    // --- Copy to clipboard ---
-    copyBtn.addEventListener('click', async () => {
-      try {
-        await navigator.clipboard.writeText(resultBox.value);
-        showToast('Скопійовано в буфер обміну');
-      } catch (e) {
-        showToast('Не вдалося скопіювати', true);
-      }
-    });
+        function renderPreviews() {
+            const container = document.getElementById('previewContainer');
+            container.innerHTML = '';
+            selectedFiles.forEach((file, index) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const div = document.createElement('div');
+                    div.className = 'relative aspect-square rounded-xl overflow-hidden border border-gray-200 bg-gray-100';
+                    div.innerHTML = `
+                        <img src="${e.target.result}" class="w-full h-full object-cover">
+                        <button onclick="removeImage(${index})" class="absolute top-1 right-1 bg-black/60 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">×</button>
+                    `;
+                    container.appendChild(div);
+                };
+                reader.readAsDataURL(file);
+            });
+        }
 
-    // --- Simple toast ---
-    let toastTimeout;
-    function showToast(message, isError = false) {
-      const existing = document.getElementById('app-toast');
-      if (existing) existing.remove();
-      const div = document.createElement('div');
-      div.id = 'app-toast';
-      div.className = 'fixed left-1/2 -translate-x-1/2 bottom-8 z-50';
-      div.innerHTML = `<div class="px-4 py-2 rounded-md text-sm ${isError ? 'bg-red-600 text-white' : 'bg-black text-white'} shadow">${escapeHtml(message)}</div>`;
-      document.body.appendChild(div);
-      clearTimeout(toastTimeout);
-      toastTimeout = setTimeout(() => div.remove(), 3500);
-    }
+        function removeImage(index) {
+            selectedFiles.splice(index, 1);
+            renderPreviews();
+        }
 
-    function escapeHtml(s) {
-      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    }
+        async function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result.split(',')[1]);
+                reader.onerror = error => reject(error);
+            });
+        }
 
-    // --- Init ---
-    loadSettings();
-    renderPreviews();
+        // Listing generation logic
+        async function generateListing() {
+            const apiKey = localStorage.getItem('gemini_api_key');
+            if (!apiKey) {
+                alert('Спочатку введи та збережи свій Gemini API ключ!');
+                document.getElementById('settingsPanel').classList.remove('hidden');
+                return;
+            }
 
-    // Optional: prompt user to install as PWA on iOS
-    // (no-op here, but meta tags at top help with appearance)
-  </script>
+            if (selectedFiles.length === 0) {
+                alert('Будь ласка, завантаж хоча б одне фото товару!');
+                return;
+            }
+
+            const loader = document.getElementById('loader');
+            const resultSection = document.getElementById('resultSection');
+            const generateBtn = document.getElementById('generateBtn');
+
+            loader.classList.remove('hidden');
+            resultSection.classList.add('hidden');
+            generateBtn.disabled = true;
+
+            try {
+                const imageParts = await Promise.all(selectedFiles.map(async (file) => {
+                    const base64Data = await fileToBase64(file);
+                    return {
+                        inline_data: {
+                            mime_type: file.type,
+                            data: base64Data
+                        }
+                    };
+                }));
+
+                const prompt = "Jesteś profesjonalnym sprzedawcą na Vinted. Przeanalizuj te zdjęcia przedmiotu i stwórz gotowe, atrakcyjne ogłoszenie po polsku. Uwzględnij: 1. Chwytliwy tytuł (Tytuł), 2. Szczegółowy opis przedmiotu (stan, marka jeśli widoczna, materiał, kolor, wymiary lub sugerowany rozmiar), 3. Odpowiednie hashtagi na końcu. Pisz naturalnie, tak jak piszą użytkownicy Vinted.";
+
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [
+                                { text: prompt },
+                                ...imageParts
+                            ]
+                        }]
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.candidates && data.candidates[0].content) {
+                    const text = data.candidates[0].content.parts.find(p => p.text)?.text || "Brak opisu";
+                    document.getElementById('resultText').value = text;
+                    resultSection.classList.remove('hidden');
+                } else {
+                    alert('Помилка від Gemini API. Перевір свій API ключ.');
+                }
+
+            } catch (error) {
+                console.error(error);
+                alert('Сталася помилка під час запиту.');
+            } finally {
+                loader.classList.add('hidden');
+                generateBtn.disabled = false;
+            }
+        }
+
+        function copyResult() {
+            const textarea = document.getElementById('resultText');
+            textarea.select();
+            document.execCommand('copy');
+            alert('Скопійовано в буфер обміну!');
+        }
+    </script>
 </body>
 </html>
